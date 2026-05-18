@@ -21,3 +21,5 @@ pydantic-settings
 # Utilities
 loguru
 python-dotenv
+
+langgraph
