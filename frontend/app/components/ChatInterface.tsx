@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Loader2, Bot, User, Mic, Image as ImageIcon, Headphones, Monitor, Laptop, Coffee, CheckCircle2 } from "lucide-react";
+import { Send, Sparkles, Loader2, Bot, User, Headphones, Monitor, Laptop, Coffee, CheckCircle2, Zap, Mic, MicOff } from "lucide-react";
 
 interface AgentStatus {
   name: string;
@@ -16,19 +16,18 @@ interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
-  agentData?: any;
 }
 
 const AGENT_LIST: AgentStatus[] = [
-  { name: "intent", label: "Intent Analysis", status: "idle" },
-  { name: "market", label: "Market Search", status: "idle" },
+  { name: "intent", label: "Understanding Request", status: "idle" },
+  { name: "market", label: "Searching Market", status: "idle" },
 ];
 
 const SUGGESTIONS = [
-  { text: "Noise-cancelling headphones under ₹15,000", icon: Headphones },
-  { text: "Ergonomic chairs for long remote work", icon: Monitor }, // using monitor as a proxy for desk setup
-  { text: "Best coding laptops with 32GB RAM", icon: Laptop },
-  { text: "Espresso machines for beginners", icon: Coffee },
+  { text: "Best noise-cancelling headphones under ₹15,000", icon: Headphones, desc: "Audio & Sound" },
+  { text: "Ergonomic chair for long work-from-home sessions", icon: Monitor, desc: "Home Office" },
+  { text: "Coding laptop with 32GB RAM under ₹1,00,000", icon: Laptop, desc: "Computing" },
+  { text: "Espresso machine for beginners under ₹20,000", icon: Coffee, desc: "Kitchen" },
 ];
 
 export default function ChatInterface({
@@ -42,27 +41,83 @@ export default function ChatInterface({
   const [agents, setAgents] = useState<AgentStatus[]>([...AGENT_LIST]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState("");
+  const [sttSupported, setSttSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  // Init Web Speech API
+  useEffect(() => {
+    // @ts-ignore
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      setSttSupported(true);
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = "en-IN";
+      rec.onresult = (event: any) => {
+        let interim = "";
+        let final = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript + " ";
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        if (final) setInput((prev) => (prev + " " + final).trim());
+        setInterimText(interim);
+      };
+      rec.onend = () => {
+        setIsListening(false);
+        setInterimText("");
+      };
+      rec.onerror = () => {
+        setIsListening(false);
+        setInterimText("");
+      };
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInterimText("");
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  }, [isListening]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText]);
 
-  const resetAgents = () => {
-    setAgents(AGENT_LIST.map((a) => ({ ...a, status: "idle" as const })));
-  };
+  const resetAgents = () => setAgents(AGENT_LIST.map((a) => ({ ...a, status: "idle" as const })));
 
   const handleSubmit = async (text?: string) => {
     const message = text || input.trim();
     if (!message || isProcessing) return;
+
+    // Stop recording if active
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      setInterimText("");
+    }
 
     setInput("");
     setIsProcessing(true);
     resetAgents();
     setStreamingText("");
 
-    // Add user message
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -76,10 +131,7 @@ export default function ChatInterface({
       const response = await fetch(`${apiUrl}/api/v1/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          conversation_id: conversationId,
-        }),
+        body: JSON.stringify({ message, conversation_id: conversationId }),
       });
 
       if (!response.ok) throw new Error("Failed to connect to backend");
@@ -100,128 +152,77 @@ export default function ChatInterface({
           accumulated = lines.pop() || "";
 
           for (const line of lines) {
-            // Track the event type from "event:" lines
             if (line.startsWith("event:")) {
               currentEventType = line.slice(6).trim();
               continue;
             }
-
             if (line.startsWith("data:")) {
               const raw = line.slice(5).trim();
               if (!raw) continue;
-
               try {
                 const data = JSON.parse(raw);
-
-                // Handle conversation_id event
                 if (currentEventType === "conversation_id" && data.conversation_id) {
                   setConversationId(data.conversation_id);
                   continue;
                 }
-
-                // Handle all agent events
-                handleSSEEvent(data, (text) => {
-                  fullTokenText += text;
+                handleSSEEvent(data, (t) => {
+                  fullTokenText += t;
                   setStreamingText(fullTokenText);
                 });
-              } catch {
-                // Skip malformed events
-              }
+              } catch { /* skip malformed */ }
             }
           }
         }
       }
 
-      // Add assistant message from accumulated tokens
       if (fullTokenText) {
-        const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: fullTokenText,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
+        setMessages((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "assistant", content: fullTokenText, timestamp: new Date() },
+        ]);
         setStreamingText("");
       }
-    } catch (error) {
-      console.error("Chat error:", error);
-      const errMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content:
-          "⚠️ Unable to connect to the backend. Please ensure the FastAPI server is running on port 8000.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errMsg]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "⚠️ Unable to connect to the backend. Please ensure the FastAPI server is running on port 8000.",
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleSSEEvent = (data: any, onToken: (text: string) => void) => {
-    const eventType = data.event_type;
-    const agentName = data.agent;
-    const message = data.message;
-
-    switch (eventType) {
+    const { event_type, agent, message, data: evData } = data;
+    switch (event_type) {
       case "agent_start":
-        setAgents((prev) =>
-          prev.map((a) =>
-            a.name === agentName
-              ? { ...a, status: "running" as const, message }
-              : a
-          )
-        );
+        setAgents((p) => p.map((a) => a.name === agent ? { ...a, status: "running", message } : a));
         break;
-
       case "agent_complete":
-        setAgents((prev) =>
-          prev.map((a) =>
-            a.name === agentName
-              ? { ...a, status: "complete" as const, message }
-              : a
-          )
-        );
+        setAgents((p) => p.map((a) => a.name === agent ? { ...a, status: "complete", message } : a));
         break;
-
       case "agent_progress":
-        setAgents((prev) =>
-          prev.map((a) =>
-            a.name === agentName ? { ...a, message } : a
-          )
-        );
+        setAgents((p) => p.map((a) => a.name === agent ? { ...a, message } : a));
         break;
-
       case "token":
-        if (data.data?.content) {
-          onToken(data.data.content);
-        }
+        if (evData?.content) onToken(evData.content);
         break;
-
       case "final_result":
-        if (data.data) {
-          onResearchComplete(data.data);
-        }
+        if (evData) onResearchComplete(evData);
         break;
-
       case "followup_needed":
-        const followupMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: message || "I need a bit more information to help you better.",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, followupMsg]);
+        setMessages((p) => [
+          ...p,
+          { id: crypto.randomUUID(), role: "assistant", content: message || "Could you tell me a bit more?", timestamp: new Date() },
+        ]);
         break;
-
       case "error":
-        setAgents((prev) =>
-          prev.map((a) =>
-            a.name === agentName
-              ? { ...a, status: "error" as const, message }
-              : a
-          )
-        );
+        setAgents((p) => p.map((a) => a.name === agent ? { ...a, status: "error", message } : a));
         break;
     }
   };
@@ -234,131 +235,178 @@ export default function ChatInterface({
   };
 
   const hasStarted = messages.length > 0;
+  const activeAgent = agents.find((a) => a.status === "running");
+  const agentMessage = activeAgent?.message || "Analyzing your request...";
 
   return (
-    <div className="flex flex-col w-full h-full bg-transparent items-center">
-      {/* Messages Area */}
-      <div className="flex-1 w-full max-w-6xl overflow-y-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col items-center">
+    <div className="flex flex-col w-full h-full">
+      {/* Messages / Welcome */}
+      <div
+        ref={messagesAreaRef}
+        className="flex-1 overflow-y-auto w-full flex flex-col items-center"
+        style={{ padding: hasStarted ? "24px 0" : "0" }}
+      >
         {!hasStarted ? (
-          // Welcome Screen / Hero Landing
-          <div className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl text-center px-2 sm:px-4">
+          /* ── Welcome ── */
+          <div className="h-full w-full flex flex-col items-center justify-center px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="w-full flex flex-col items-center text-center"
+              transition={{ duration: 0.5 }}
+              className="w-full max-w-2xl mx-auto flex flex-col items-center text-center"
             >
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-[var(--text-tertiary)]">
-                <Sparkles className="h-3.5 w-3.5 text-[var(--primary)]" />
-                Evidence-backed shopping intelligence
+              {/* Icon */}
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6"
+                style={{ background: "linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)", boxShadow: "0 8px 32px var(--primary-glow)" }}
+              >
+                <Zap className="w-7 h-7 text-white" fill="white" />
               </div>
-              <h2 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-5 text-[var(--text-primary)] leading-[1.05] tracking-tight text-center text-balance">
-                What should we verify before you buy?
+
+              {/* Headline */}
+              <h2
+                className="text-4xl sm:text-5xl font-extrabold mb-4 leading-tight"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                <span style={{ color: "var(--text-primary)" }}>What should we</span>{" "}
+                <span className="gradient-text">verify</span>{" "}
+                <span style={{ color: "var(--text-primary)" }}>before you buy?</span>
               </h2>
-              <p className="text-[var(--text-secondary)] mb-10 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-center">
-                Ask about a product, budget, use case, or comparison. VeriBuy checks market signals, creator reviews, and community evidence before recommending.
+
+              <p className="text-base mb-10 leading-relaxed max-w-lg" style={{ color: "var(--text-secondary)" }}>
+                Describe what you&apos;re looking for. VeriBuy checks market prices, community reviews, and expert videos before recommending.
               </p>
 
               {/* Suggestion Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl mx-auto mb-12">
-                {SUGGESTIONS.map((suggestion, i) => (
+              <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mb-8">
+                {SUGGESTIONS.map((s, i) => (
                   <motion.button
                     key={i}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + i * 0.1 }}
-                    onClick={() => handleSubmit(suggestion.text)}
-                    className="premium-card premium-card-hover p-4 text-left flex items-start gap-3 cursor-pointer overflow-hidden min-h-[86px]"
+                    transition={{ delay: 0.15 + i * 0.07 }}
+                    onClick={() => handleSubmit(s.text)}
+                    className="card card-hover group flex items-start gap-3 p-4 text-left w-full"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-[var(--primary-subtle)] flex items-center justify-center shrink-0">
-                      <suggestion.icon className="w-4 h-4 text-[var(--primary)]" />
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: "var(--primary-subtle)" }}
+                    >
+                      <s.icon className="w-4 h-4" style={{ color: "var(--primary)" }} />
                     </div>
-                    <span className="text-sm font-semibold text-[var(--text-secondary)] leading-snug line-clamp-2">
-                      {suggestion.text}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold leading-snug mb-0.5" style={{ color: "var(--text-primary)" }}>
+                        {s.text}
+                      </p>
+                      <p className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>{s.desc}</p>
+                    </div>
                   </motion.button>
                 ))}
               </div>
+
+              {/* Badge */}
+              <span className="badge" style={{ background: "var(--primary-subtle)", color: "var(--primary)", border: "1px solid rgba(109,40,217,0.15)" }}>
+                <Sparkles className="w-3 h-3" />
+                Evidence-backed AI research
+              </span>
             </motion.div>
           </div>
         ) : (
-          // Chat Messages
-          <div className="w-full max-w-4xl flex flex-col gap-5 pb-4">
+          /* ── Messages ── */
+          <div className="w-full max-w-2xl px-6 flex flex-col gap-5">
             {messages.map((msg, i) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i === messages.length - 1 ? 0.1 : 0 }}
-                className={`flex gap-2 sm:gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                transition={{ delay: i === messages.length - 1 ? 0.05 : 0 }}
+                className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 {msg.role !== "user" && (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[var(--primary-subtle)] flex items-center justify-center shrink-0 mt-1 border border-[var(--border)]">
-                    <Bot className="w-4 h-4 text-[var(--primary)]" />
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: "var(--primary-subtle)", border: "1px solid rgba(109,40,217,0.15)" }}
+                  >
+                    <Bot className="w-4 h-4" style={{ color: "var(--primary)" }} />
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[88%] sm:max-w-[78%] w-fit px-4 py-3 text-sm leading-relaxed shadow-sm flex-shrink-0 overflow-hidden ${msg.role === "user"
-                      ? "bg-gradient-to-br from-violet-500 to-indigo-500 text-white rounded-2xl rounded-tr-md shadow-[var(--shadow-glow)]"
-                      : "premium-card rounded-2xl rounded-tl-md prose-ai"
-                    }`}
+                  className="msg-bubble px-4 py-3 rounded-2xl text-[13.5px] leading-relaxed"
+                  style={
+                    msg.role === "user"
+                      ? {
+                          background: "linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%)",
+                          color: "#fff",
+                          borderRadius: "18px 4px 18px 18px",
+                          boxShadow: "0 2px 12px var(--primary-glow)",
+                        }
+                      : {
+                          background: "var(--card-bg)",
+                          border: "1px solid var(--card-border)",
+                          color: "var(--text-secondary)",
+                          borderRadius: "4px 18px 18px 18px",
+                          boxShadow: "var(--card-shadow)",
+                        }
+                  }
                 >
-                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
                   <div
-                    className={`text-[10px] mt-1.5 font-medium ${msg.role === "user"
-                        ? "text-white/70 text-right"
-                        : "text-[var(--text-tertiary)]"
-                      }`}
+                    className="text-[10px] mt-1.5"
+                    style={{ color: msg.role === "user" ? "rgba(255,255,255,0.6)" : "var(--text-tertiary)", textAlign: msg.role === "user" ? "right" : "left" }}
                   >
-                    {msg.timestamp.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
 
                 {msg.role === "user" && (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white/[0.06] flex items-center justify-center shrink-0 mt-1 shadow-sm border border-[var(--border)]">
-                    <User className="w-4 h-4 text-[var(--primary)]" />
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+                  >
+                    <User className="w-4 h-4" style={{ color: "var(--text-tertiary)" }} />
                   </div>
                 )}
               </motion.div>
             ))}
 
-            {/* Streaming text */}
+            {/* Streaming bubble */}
             {streamingText && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex gap-3"
-              >
-                <div className="w-9 h-9 rounded-xl bg-[var(--primary-subtle)] flex items-center justify-center shrink-0 mt-1 border border-[var(--border)]">
-                  <Bot className="w-4 h-4 text-[var(--primary)]" />
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 justify-start">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: "var(--primary-subtle)", border: "1px solid rgba(109,40,217,0.15)" }}
+                >
+                  <Bot className="w-4 h-4" style={{ color: "var(--primary)" }} />
                 </div>
-                <div className="premium-card max-w-[88%] sm:max-w-[78%] px-4 py-3 rounded-2xl rounded-bl-md text-sm leading-relaxed whitespace-pre-wrap prose-ai">
-                  {streamingText}
-                  <span className="inline-block w-1.5 h-4 bg-[var(--primary)] ml-0.5 animate-pulse" />
+                <div
+                  className="msg-bubble px-4 py-3 text-[13.5px] leading-relaxed"
+                  style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", color: "var(--text-secondary)", borderRadius: "4px 18px 18px 18px", boxShadow: "var(--card-shadow)" }}
+                >
+                  <span className="whitespace-pre-wrap">{streamingText}</span>
+                  <span
+                    className="inline-block w-[3px] h-4 ml-0.5 animate-pulse align-middle"
+                    style={{ background: "var(--primary)", borderRadius: "2px" }}
+                  />
                 </div>
               </motion.div>
             )}
 
             {/* Typing indicator */}
             {isProcessing && !streamingText && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex gap-3"
-              >
-                <div className="w-9 h-9 rounded-xl bg-[var(--primary-subtle)] flex items-center justify-center shrink-0 border border-[var(--border)]">
-                  <Loader2 className="w-4 h-4 text-[var(--primary)] animate-spin" />
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 justify-start">
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: "var(--primary-subtle)", border: "1px solid rgba(109,40,217,0.15)" }}
+                >
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--primary)" }} />
                 </div>
-                <div className="premium-card px-4 py-3 rounded-2xl rounded-bl-md">
+                <div
+                  className="px-4 py-3 text-[13.5px]"
+                  style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "4px 18px 18px 18px", boxShadow: "var(--card-shadow)" }}
+                >
                   <div className="typing-dots">
-                    <span />
-                    <span />
-                    <span />
+                    <span /><span /><span />
                   </div>
                 </div>
               </motion.div>
@@ -369,85 +417,122 @@ export default function ChatInterface({
         )}
       </div>
 
-      {/* Input Area */}
-      <div className={`px-3 sm:px-4 py-3 transition-all duration-500 ease-in-out w-full flex justify-center ${!hasStarted ? 'mt-auto mb-5 md:mb-9' : 'border-t border-[var(--border)] bg-[var(--bg-glass)] backdrop-blur-xl pb-4 sm:pb-5'}`}>
-        <div className="w-full max-w-4xl relative">
-          <div className="premium-card flex items-end gap-2 p-2.5 sm:p-3 rounded-2xl focus-within:border-[var(--border-hover)] focus-within:shadow-[var(--shadow-glow)] transition-all duration-200">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Describe what you're looking for..."
-              rows={1}
-              className="flex-1 bg-transparent border-none outline-none resize-none py-2.5 px-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] leading-relaxed min-w-0"
-              style={{ minHeight: "42px", maxHeight: "120px" }}
-              disabled={isProcessing}
-            />
+      {/* ── Input Bar ─────────────────────────────── */}
+      <div
+        className="shrink-0 w-full flex justify-center"
+        style={{
+          borderTop: hasStarted ? "1px solid var(--border)" : "none",
+          background: hasStarted ? "var(--bg-nav)" : "transparent",
+          backdropFilter: hasStarted ? "blur(20px)" : "none",
+          padding: hasStarted ? "14px 16px 16px" : "0 16px 32px",
+        }}
+      >
+        <div className="w-full max-w-2xl">
+          <div
+            className="flex items-end gap-2 p-2 rounded-2xl transition-all"
+            style={{
+              background: "var(--surface-0)",
+              border: isListening ? "1.5px solid rgba(239,68,68,0.5)" : "1.5px solid var(--border-md)",
+              boxShadow: isListening ? "0 0 0 3px rgba(239,68,68,0.08)" : "var(--card-shadow)",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+            }}
+          >
+            {/* Mic Button */}
+            {sttSupported && (
+              <button
+                onClick={toggleListening}
+                disabled={isProcessing}
+                title={isListening ? "Stop recording" : "Speak your query"}
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all relative"
+                style={
+                  isListening
+                    ? { background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }
+                    : { background: "var(--surface-2)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }
+                }
+              >
+                {isListening && (
+                  <span className="absolute inset-0 rounded-xl animate-ping" style={{ background: "rgba(239,68,68,0.15)" }} />
+                )}
+                {isListening ? <MicOff className="w-4 h-4 relative z-10" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
 
-            {/* Action Icons */}
-            <div className="hidden sm:flex items-center gap-0.5 text-[var(--text-tertiary)]">
-              <button className="p-2 hover:text-[var(--text-primary)] transition-colors rounded-lg hover:bg-white/[0.06]">
-                <Mic className="w-4 h-4" />
-              </button>
-              <button className="p-2 hover:text-[var(--text-primary)] transition-colors rounded-lg hover:bg-white/[0.06]">
-                <ImageIcon className="w-4 h-4" />
-              </button>
+            <div className="flex-1 flex flex-col min-w-0">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isListening ? "Listening… speak now" : "Describe what you're looking for…"}
+                rows={1}
+                disabled={isProcessing}
+                className="flex-1 bg-transparent outline-none resize-none text-[13.5px] leading-relaxed py-2.5 px-2"
+                style={{
+                  minHeight: "44px",
+                  maxHeight: "130px",
+                  color: "var(--text-primary)",
+                  border: "none",
+                }}
+              />
+              {/* Interim transcription preview */}
+              {interimText && (
+                <p className="px-2 pb-1 text-[12px] italic" style={{ color: "var(--text-tertiary)" }}>
+                  {interimText}
+                  <span className="inline-block w-1 h-3 ml-0.5 align-middle animate-pulse rounded-sm" style={{ background: "#ef4444" }} />
+                </p>
+              )}
             </div>
-
             <button
               onClick={() => handleSubmit()}
               disabled={!input.trim() || isProcessing}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${input.trim() && !isProcessing
-                  ? "bg-[var(--primary)] text-white shadow-[var(--shadow-glow)] hover:bg-[var(--primary-hover)] hover:-translate-y-0.5"
-                  : "bg-white/[0.06] text-[var(--text-tertiary)]"
-                }`}
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all"
+              style={
+                input.trim() && !isProcessing
+                  ? { background: "var(--primary)", color: "#fff", boxShadow: "0 2px 10px var(--primary-glow)" }
+                  : { background: "var(--surface-2)", color: "var(--text-tertiary)" }
+              }
             >
-              {isProcessing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
+              {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
 
-          {/* Horizontal Pipeline Stepper (Mockup Style) */}
+          {/* Pipeline Status */}
           <AnimatePresence>
             {isProcessing && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-6 flex flex-col items-center justify-center z-50"
+                exit={{ opacity: 0, y: -6 }}
+                className="mt-3 flex flex-col items-center gap-2"
               >
-                <div className="premium-card flex items-center gap-2 md:gap-3 flex-wrap justify-center max-w-full px-3 py-3 rounded-2xl">
+                <div className="flex items-center gap-2 flex-wrap justify-center">
                   {agents.map((agent, i) => (
-                    <div key={agent.name} className="flex items-center">
+                    <div key={agent.name} className="flex items-center gap-2">
                       <div
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors shadow-sm border ${agent.status === "complete"
-                            ? "bg-[var(--primary-subtle)] text-[var(--text-accent)] border-[var(--border-hover)]"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all"
+                        style={
+                          agent.status === "complete"
+                            ? { background: "rgba(5,150,105,0.08)", color: "var(--success)", border: "1px solid rgba(5,150,105,0.2)" }
                             : agent.status === "running"
-                              ? "bg-white/[0.08] text-[var(--text-primary)] border-[var(--border-hover)] shadow-[var(--shadow-glow)] animate-pulse"
-                              : "bg-white/[0.04] text-[var(--text-tertiary)] border-[var(--border)]"
-                          }`}
+                            ? { background: "var(--primary-subtle)", color: "var(--primary)", border: "1px solid rgba(109,40,217,0.25)", boxShadow: "0 0 12px var(--primary-glow)" }
+                            : { background: "var(--surface-1)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }
+                        }
                       >
                         {agent.status === "complete" && <CheckCircle2 className="w-3.5 h-3.5" />}
                         {agent.status === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        {agent.status === "idle" && <div className="w-1.5 h-1.5 rounded-full bg-[var(--border-hover)]" />}
+                        {agent.status === "idle" && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--text-tertiary)" }} />}
                         {agent.label}
                       </div>
-
-                      {/* Connecting Line */}
                       {i < agents.length - 1 && (
-                        <div className={`w-4 md:w-6 h-px mx-1 md:mx-2 ${agents[i].status === "complete" ? "bg-[var(--primary)]" : "bg-[var(--border)]"
-                          }`} />
+                        <div
+                          className="w-5 h-px"
+                          style={{ background: agents[i].status === "complete" ? "var(--primary)" : "var(--border)" }}
+                        />
                       )}
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 text-xs font-medium text-[var(--text-tertiary)] max-w-lg text-center truncate italic">
-                  {agents.find(a => a.status === "running")?.message || "Analyzing request..."}
-                </div>
+                <p className="text-[11px] italic" style={{ color: "var(--text-tertiary)" }}>{agentMessage}</p>
               </motion.div>
             )}
           </AnimatePresence>

@@ -95,32 +95,36 @@ export default function Dashboard({ data }: DashboardProps) {
   })() : [];
 
   return (
-    <div className="veribuy-dashboard h-full w-full overflow-y-auto flex flex-col items-center bg-transparent">
-      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+    <div className="dashboard-root h-full w-full overflow-y-auto flex flex-col items-center" style={{ background: "var(--bg-app)" }}>
+      <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-7 space-y-6">
 
         {/* ─── HEADER ─── */}
-        <motion.div {...fadeUp(0)} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-slate-950 via-violet-700 to-cyan-700 bg-clip-text text-transparent tracking-tight">Research Results</h2>
-            <p className="text-sm text-[var(--text-tertiary)] mt-1 capitalize">{intent?.product_category}{intent?.usage_context !== "general" ? ` for ${intent?.usage_context}` : ""}{intent?.budget_range?.max_price < 999999 ? ` • Budget ₹${intent?.budget_range?.max_price?.toLocaleString()}` : ""}</p>
+        <motion.div {...fadeUp(0)} className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-2">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Research Results</h2>
+            <p className="text-sm mt-1 capitalize" style={{ color: "var(--text-tertiary)" }}>
+              {intent?.product_category}
+              {intent?.usage_context !== "general" ? ` · ${intent?.usage_context}` : ""}
+              {intent?.budget_range?.max_price < 999999 ? ` · Budget ₹${intent?.budget_range?.max_price?.toLocaleString()}` : ""}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {overallSent && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border" style={{ borderColor: overallSent.color+"30", background: overallSent.color+"10", color: overallSent.color }}>
-                <Star className="w-3.5 h-3.5" /> {overallSent.label} ({overallSent.pct}%)
+              <span className="stat-chip" style={{ borderColor: overallSent.color+"30", background: overallSent.color+"12", color: overallSent.color }}>
+                <Star className="w-3 h-3" /> {overallSent.label} ({overallSent.pct}%)
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
-              <ShoppingBag className="w-3.5 h-3.5" /> {market.total_found} Matches
+            <span className="stat-chip" style={{ background: "rgba(5,150,105,0.08)", color: "#059669", borderColor: "rgba(5,150,105,0.2)" }}>
+              <ShoppingBag className="w-3 h-3" /> {market.total_found} Matches
             </span>
             {reddit?.threads_analyzed > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-600 border border-orange-200">
-                <MessageCircle className="w-3.5 h-3.5" /> {reddit.threads_analyzed} Threads
+              <span className="stat-chip" style={{ background: "rgba(234,88,12,0.08)", color: "#ea580c", borderColor: "rgba(234,88,12,0.2)" }}>
+                <MessageCircle className="w-3 h-3" /> {reddit.threads_analyzed} Threads
               </span>
             )}
             {youtubeEvidenceCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">
-                <Play className="w-3.5 h-3.5" /> {youtubeEvidenceCount} YouTube
+              <span className="stat-chip" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626", borderColor: "rgba(220,38,38,0.2)" }}>
+                <Play className="w-3 h-3" /> {youtubeEvidenceCount} YouTube
               </span>
             )}
           </div>
@@ -128,33 +132,50 @@ export default function Dashboard({ data }: DashboardProps) {
 
         {/* ─── TOP PICK SPOTLIGHT ─── */}
         {topPick && (
-          <motion.div {...fadeUp(0.1)} className="premium-card premium-card-hover relative rounded-2xl overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-            <div className="p-6 sm:p-8 md:p-10 flex flex-col md:flex-row gap-8 md:gap-10">
-              <div className="md:w-2/5 flex items-center justify-center">
+          <motion.div {...fadeUp(0.1)} className="card card-hover relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1" style={{ background: "linear-gradient(90deg, var(--primary) 0%, #7c3aed 50%, #06b6d4 100%)" }} />
+            <div className="p-6 sm:p-8 flex flex-col sm:flex-row gap-6 sm:gap-8">
+              {/* Image */}
+              <div className="sm:w-[200px] shrink-0 flex items-center justify-center">
                 {topPick.image_url ? (
-                  <div className="muted-surface w-full max-w-[280px] aspect-square rounded-2xl p-4 shadow-md flex items-center justify-center">
-                    <img src={topPick.image_url} alt={topPick.name} className="max-w-full max-h-full object-contain" />
+                  <div className="w-full aspect-square rounded-xl overflow-hidden flex items-center justify-center" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+                    <img src={topPick.image_url} alt={topPick.name} className="w-full h-full object-contain p-3" />
                   </div>
                 ) : (
-                  <div className="muted-surface w-full max-w-[280px] aspect-square rounded-2xl flex items-center justify-center"><ShoppingBag className="w-16 h-16 text-[var(--text-tertiary)]" /></div>
+                  <div className="w-full aspect-square rounded-xl flex items-center justify-center" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+                    <ShoppingBag className="w-12 h-12" style={{ color: "var(--text-tertiary)" }} />
+                  </div>
                 )}
               </div>
-              <div className="md:w-3/5 flex flex-col justify-center">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-500 text-white flex items-center gap-1"><Trophy className="w-3 h-3" /> #1 TOP PICK</span>
-                  {topPick.platform && <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200">{topPick.platform}</span>}
+              {/* Info */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center pt-3">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="badge text-white" style={{ background: "linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%)" }}>
+                    <Trophy className="w-3 h-3" /> #1 Top Pick
+                  </span>
+                  {topPick.platform && (
+                    <span className="badge" style={{ background: "var(--accent-subtle)", color: "var(--accent)", border: "1px solid rgba(14,165,233,0.2)" }}>
+                      {topPick.platform}
+                    </span>
+                  )}
                 </div>
-                <h3 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] mb-2 leading-tight break-words">{topPick.name}</h3>
-                {topPick.brand && <p className="text-sm text-slate-500 mb-4">{topPick.brand}{topPick.model ? ` · ${topPick.model}` : ""}</p>}
-                <p className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6">₹{topPick.price?.toLocaleString()}</p>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {topPick.pros?.map((p: string, i: number) => <span key={i} className="max-w-full px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 break-words">✓ {p}</span>)}
-                  {topPick.cons?.map((c: string, i: number) => <span key={i} className="max-w-full px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-600 border border-red-200 break-words">✗ {c}</span>)}
+                <h3 className="text-lg sm:text-xl font-bold mb-1 leading-snug" style={{ color: "var(--text-primary)" }}>{topPick.name}</h3>
+                {topPick.brand && <p className="text-sm mb-3" style={{ color: "var(--text-tertiary)" }}>{topPick.brand}{topPick.model ? ` · ${topPick.model}` : ""}</p>}
+                <p className="text-3xl font-extrabold mb-4" style={{ color: "var(--primary)" }}>₹{topPick.price?.toLocaleString()}</p>
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {topPick.pros?.map((p: string, i: number) => (
+                    <span key={i} className="badge" style={{ background: "rgba(5,150,105,0.08)", color: "#059669", border: "1px solid rgba(5,150,105,0.18)" }}>✓ {p}</span>
+                  ))}
+                  {topPick.cons?.map((c: string, i: number) => (
+                    <span key={i} className="badge" style={{ background: "rgba(220,38,38,0.07)", color: "#dc2626", border: "1px solid rgba(220,38,38,0.15)" }}>✗ {c}</span>
+                  ))}
                 </div>
                 {topPick.url && (
-                  <a href={topPick.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white text-sm font-bold shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:-translate-y-0.5 w-fit">
-                    View on {topPick.platform || "Store"} <ExternalLink className="w-4 h-4" />
+                  <a href={topPick.url} target="_blank" rel="noopener noreferrer"
+                    className="btn btn-primary w-fit text-sm"
+                    style={{ borderRadius: "10px" }}
+                  >
+                    View on {topPick.platform || "Store"} <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 )}
               </div>
@@ -185,8 +206,8 @@ export default function Dashboard({ data }: DashboardProps) {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-[var(--text-tertiary)]">{deal.platform || 'Store'}</span>
-                      {isCheapest && <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold">BEST PRICE</span>}
+                      <span className="text-xs font-bold text-[var(--text-tertiary)] truncate">{deal.platform || 'Store'}</span>
+                      {isCheapest && <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold shrink-0">BEST PRICE</span>}
                     </div>
                     <div className="text-xl font-extrabold text-[var(--text-primary)] mb-1">
                       ₹{deal.price?.toLocaleString()}
@@ -213,31 +234,48 @@ export default function Dashboard({ data }: DashboardProps) {
 
         {/* ─── OTHER PRODUCTS ─── */}
         {otherProducts.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {otherProducts.map((product: any, idx: number) => (
-              <motion.div key={idx} {...fadeUp(0.2 + idx * 0.08)} className="premium-card premium-card-hover rounded-2xl p-6 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold bg-slate-100 text-[var(--text-secondary)]">#{idx + 2}</div>
-                  {product.platform && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{product.platform}</span>}
-                </div>
-                {product.image_url ? (
-                  <div className="muted-surface w-full h-36 mb-4 rounded-xl p-2 flex items-center justify-center shadow-sm"><img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain" /></div>
-                ) : (
-                  <div className="muted-surface w-full h-36 mb-4 rounded-xl flex items-center justify-center"><ShoppingBag className="w-8 h-8 text-[var(--text-tertiary)]" /></div>
-                )}
-                <h4 className="font-bold text-sm text-[var(--text-primary)] mb-1 line-clamp-2 break-words">{product.name}</h4>
-                {product.brand && <p className="text-xs text-slate-400 mb-3">{product.brand}</p>}
-                <p className="text-2xl font-extrabold text-indigo-600 mb-4">₹{product.price?.toLocaleString()}</p>
-                <div className="space-y-2 mb-4 flex-1">
-                  {product.pros?.slice(0,2).map((p:string,i:number) => <p key={i} className="text-xs text-slate-600 flex items-start gap-1.5 break-words"><span className="text-emerald-500 mt-0.5 shrink-0">✓</span>{p}</p>)}
-                  {product.cons?.slice(0,1).map((c:string,i:number) => <p key={i} className="text-xs text-slate-600 flex items-start gap-1.5 break-words"><span className="text-red-400 mt-0.5 shrink-0">✗</span>{c}</p>)}
-                </div>
-                <div className="mt-auto pt-3 border-t border-[var(--border)]">
-                  {product.url ? (
-                    <a href={product.url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold transition-colors">View on {product.platform || "Store"} <ExternalLink className="w-3.5 h-3.5" /></a>
+              <motion.div key={idx} {...fadeUp(0.2 + idx * 0.08)} className="card card-hover flex flex-col overflow-hidden">
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: "var(--primary-subtle)", color: "var(--primary)" }}>#{idx + 2}</div>
+                    {product.platform && <span className="badge" style={{ background: "var(--surface-1)", color: "var(--text-tertiary)", border: "1px solid var(--border)" }}>{product.platform}</span>}
+                  </div>
+                  {product.image_url ? (
+                    <div className="w-full h-32 mb-3 rounded-lg flex items-center justify-center overflow-hidden" style={{ background: "var(--surface-1)" }}>
+                      <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain p-2" />
+                    </div>
                   ) : (
-                    <button disabled className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed">Link Unavailable</button>
+                    <div className="w-full h-32 mb-3 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-1)" }}>
+                      <ShoppingBag className="w-7 h-7" style={{ color: "var(--text-tertiary)" }} />
+                    </div>
                   )}
+                  <h4 className="font-semibold text-[13px] mb-1 leading-snug" style={{ color: "var(--text-primary)" }}>{product.name}</h4>
+                  {product.brand && <p className="text-[11px] mb-2" style={{ color: "var(--text-tertiary)" }}>{product.brand}</p>}
+                  <p className="text-xl font-extrabold mb-3" style={{ color: "var(--primary)" }}>₹{product.price?.toLocaleString()}</p>
+                  <div className="space-y-1.5 mb-3 flex-1">
+                    {product.pros?.slice(0,2).map((p:string,i:number) => (
+                      <p key={i} className="text-[12px] flex items-start gap-1.5" style={{ color: "var(--text-secondary)" }}>
+                        <span className="shrink-0 mt-0.5" style={{ color: "#059669" }}>✓</span>{p}
+                      </p>
+                    ))}
+                    {product.cons?.slice(0,1).map((c:string,i:number) => (
+                      <p key={i} className="text-[12px] flex items-start gap-1.5" style={{ color: "var(--text-secondary)" }}>
+                        <span className="shrink-0 mt-0.5" style={{ color: "#dc2626" }}>✗</span>{c}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                    {product.url ? (
+                      <a href={product.url} target="_blank" rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold text-white transition-colors"
+                        style={{ background: "var(--primary)" }}
+                      >View on {product.platform || "Store"} <ExternalLink className="w-3 h-3" /></a>
+                    ) : (
+                      <button disabled className="w-full py-2.5 rounded-xl text-xs font-semibold" style={{ background: "var(--surface-2)", color: "var(--text-tertiary)" }}>Link Unavailable</button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -297,44 +335,51 @@ export default function Dashboard({ data }: DashboardProps) {
             </div>
           </div>
 
+          {/* Reddit tab */}
           {activeEvidence === "reddit" ? (
             <div className="p-5 space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.15fr] gap-4">
-                <div className="rounded-xl bg-orange-50 border border-orange-200 p-5">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <span className="text-xs font-bold text-orange-600">Reddit Summary</span>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-orange-500 border border-orange-100">{reddit?.threads_analyzed || 0} threads</span>
+              {/* Summary + Recommendation row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl p-4" style={{ background: "rgba(234,88,12,0.06)", border: "1px solid rgba(234,88,12,0.18)" }}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[12px] font-bold" style={{ color: "#ea580c" }}>Reddit Summary</span>
+                    <span className="badge" style={{ background: "#fff", color: "#ea580c", border: "1px solid rgba(234,88,12,0.2)" }}>{reddit?.threads_analyzed || 0} threads</span>
                   </div>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed break-words">{redditSummary}</p>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{redditSummary}</p>
                 </div>
-                <div className="soft-panel p-5">
-                  <div className="text-xs font-bold text-[var(--text-tertiary)] mb-3">Separate Recommendation</div>
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed break-words">{redditRecommendation}</p>
+                <div className="rounded-xl p-4" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+                  <div className="text-[11px] font-bold mb-2" style={{ color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Recommendation</div>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{redditRecommendation}</p>
                   {overallSent && (
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex-1 h-2 rounded-full bg-slate-200 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${overallSent.pct}%`, background: overallSent.color }} />
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${overallSent.pct}%`, background: overallSent.color }} />
                       </div>
-                      <span className="text-xs font-bold" style={{ color: overallSent.color }}>{overallSent.label}</span>
+                      <span className="text-[12px] font-bold" style={{ color: overallSent.color }}>{overallSent.label}</span>
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Comment cards */}
               <div>
-                <div className="text-xs font-bold text-[var(--text-tertiary)] mb-3">Reddit Sources</div>
+                <div className="text-[11px] font-bold mb-3" style={{ color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Reddit Sources</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {comments.slice(0, 8).map((c: any, i: number) => {
                     const s = sentiment(c.comment);
                     return (
-                      <div key={i} className="soft-panel p-5 hover:border-orange-300 transition-colors">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: s.color + "12", color: s.color }}>{s.label}</span>
-                          <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)]"><ArrowUp className="w-3 h-3" />{c.upvotes}</span>
+                      <div key={i} className="rounded-xl p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="badge" style={{ background: s.color+"12", color: s.color, border: "1px solid "+s.color+"30" }}>{s.label}</span>
+                          <span className="flex items-center gap-1 text-[12px]" style={{ color: "var(--text-tertiary)" }}>
+                            <ArrowUp className="w-3 h-3" />{c.upvotes}
+                          </span>
                         </div>
-                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 break-words">&ldquo;{c.comment}&rdquo;</p>
-                        {c.thread_title && <p className="text-[10px] text-[var(--text-tertiary)] mt-2 line-clamp-1">{c.thread_title}</p>}
-                        {c.thread_url && <a href={c.thread_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-orange-500 hover:underline mt-2 inline-block font-medium">View source -&gt;</a>}
+                        <p className="text-[12.5px] leading-relaxed line-clamp-4" style={{ color: "var(--text-secondary)" }}>&ldquo;{c.comment}&rdquo;</p>
+                        {c.thread_title && <p className="text-[11px] line-clamp-1" style={{ color: "var(--text-tertiary)" }}>{c.thread_title}</p>}
+                        {c.thread_url && (
+                          <a href={c.thread_url} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold mt-auto" style={{ color: "#ea580c" }}>View source →</a>
+                        )}
                       </div>
                     );
                   })}

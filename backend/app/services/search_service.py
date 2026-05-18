@@ -143,7 +143,7 @@ async def search_products(
             if price == 0:
                 price = extract_inr_price(" ".join([title, price_text]))
 
-            if is_suspicious_url(url):
+            if is_suspicious_url(url) or is_suspicious_url(item.get("source", "")):
                 continue
 
             products.append({
@@ -198,8 +198,22 @@ async def search_products(
                 "scraped_content": ""  
             })
 
-        priced_count = sum(1 for product in products if product.get("price", 0) > 0)
-        logger.info(f"Serper API returned {len(products)} results ({priced_count} with parsed prices).")
+        valid_products = []
+        for p in products:
+            price = p.get("price", 0)
+            if price > 0:
+                if min_price > 0 and price < min_price:
+                    continue
+                if max_price < 999999 and price > max_price:
+                    continue
+            valid_products.append(p)
+            
+        priced = [p for p in valid_products if p.get("price", 0) > 0]
+        unpriced = [p for p in valid_products if p.get("price", 0) == 0]
+        products = priced + unpriced
+
+        priced_count = len(priced)
+        logger.info(f"Serper API returned {len(products)} valid results ({priced_count} with parsed prices within budget).")
         return products
 
     except Exception as e:
