@@ -1,0 +1,5 @@
+.env
+backend/.env
+./venv
+ docker-compose.yml
+setup_ollama_models.ps1

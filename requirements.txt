@@ -1,0 +1,23 @@
+# FastAPI
+fastapi
+uvicorn[standard]
+sse-starlette
+python-multipart
+
+# AI / LLM (LangChain + Ollama)
+langchain-ollama
+langchain-core
+httpx
+
+# Scraping
+requests
+beautifulsoup4
+ddgs
+
+# Validation & Settings
+pydantic
+pydantic-settings
+
+# Utilities
+loguru
+python-dotenv

@@ -1,0 +1,28 @@
+# FastAPI
+fastapi
+uvicorn[standard]
+sse-starlette
+python-multipart
+
+# AI / LLM (LangChain + Ollama/HuggingFace)
+langchain-ollama
+langchain-huggingface
+langchain-core
+langgraph
+httpx
+
+# YouTube
+youtube-transcript-api
+
+# Scraping
+requests
+beautifulsoup4
+ddgs
+
+# Validation & Settings
+pydantic
+pydantic-settings
+
+# Utilities
+loguru
+python-dotenv
