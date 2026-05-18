@@ -55,14 +55,14 @@ export default function Home() {
                 <Search className="w-3.5 h-3.5" />
                 Search
               </button>
-              <button className="tab-item">
+              {/* <button className="tab-item">
                 <ShoppingBag className="w-3.5 h-3.5" />
                 Orders
               </button>
               <button className="tab-item">
                 <User className="w-3.5 h-3.5" />
                 Profile
-              </button>
+              </button> */}
             </div>
           </nav>
 
