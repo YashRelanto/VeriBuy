@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TrustCart | Precision Decision Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Shared Components Styles are integrated via the Tailwind Config and direct class mapping -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary": "#ffffff",
+                    "surface-variant": "#d3e4fe",
+                    "on-background": "#0b1c30",
+                    "primary": "#1f108e",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "surface-bright": "#f8f9ff",
+                    "secondary": "#006c4a",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-surface": "#213145",
+                    "on-error-container": "#93000a",
+                    "on-secondary": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "on-primary-fixed": "#0f0069",
+                    "inverse-on-surface": "#eaf1ff",
+                    "primary-fixed": "#e2dfff",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed-variant": "#6e3900",
+                    "on-surface-variant": "#464553",
+                    "background": "#f8f9ff",
+                    "on-secondary-fixed": "#002114",
+                    "tertiary": "#482300",
+                    "on-primary-fixed-variant": "#3b35a7",
+                    "error-container": "#ffdad6",
+                    "surface-container-highest": "#d3e4fe",
+                    "tertiary-container": "#683600",
+                    "tertiary-fixed-dim": "#ffb77d",
+                    "on-tertiary-fixed": "#2f1500",
+                    "secondary-container": "#82f5c1",
+                    "surface-dim": "#cbdbf5",
+                    "on-tertiary-container": "#ff9631",
+                    "on-surface": "#0b1c30",
+                    "inverse-primary": "#c3c0ff",
+                    "secondary-fixed": "#85f8c4",
+                    "on-primary-container": "#a9a7ff",
+                    "primary-container": "#3730a3",
+                    "surface-tint": "#544fc0",
+                    "surface-container": "#e5eeff",
+                    "on-tertiary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "outline-variant": "#c8c4d5",
+                    "on-secondary-fixed-variant": "#005137"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-lg": "32px",
+                    "gutter": "24px",
+                    "stack-sm": "8px",
+                    "stack-md": "16px",
+                    "container-max": "1200px",
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "margin-desktop": "40px",
+                    "stack-xs": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "label-xs": ["Inter"],
+                    "label-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "headline-xl-mobile": ["36px", {"lineHeight": "44px", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "label-xs": ["11px", {"lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+        }
+        .sentiment-gradient {
+            background: linear-gradient(90deg, #ba1a1a 0%, #82f5c1 100%);
+        }
+        .text-glow {
+            text-shadow: 0 0 20px rgba(31, 16, 142, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-x-hidden">
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm transition-all duration-300">
+<div class="flex items-center justify-between px-margin-desktop py-stack-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-stack-md">
+<img alt="TrustCart Logo" class="h-8 w-8 object-contain" src="data:image/png;base64,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"/>
+<span class="font-headline-md text-headline-md font-bold text-primary">TrustCart</span>
+</div>
+<nav class="hidden md:flex items-center gap-stack-lg">
+<a class="font-body-md text-body-md text-primary border-b-2 border-primary hover:text-primary transition-colors cursor-pointer" href="#">Research Hub</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Marketplace Analysis</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Pricing</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#">Intelligence</a>
+</nav>
+<div class="flex items-center gap-stack-md">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer">settings</span>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="h-full w-full object-cover" data-alt="A professional headshot of a young entrepreneur in a modern office environment. The lighting is soft and natural, emphasizing a high-precision, trustworthy image suited for an AI analyst tool. The background is slightly blurred with corporate cool tones, maintaining a focus on the subject's approachable yet authoritative expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGzYCAvegKfW2OWlcYk_QS49kTexUS9_YgzKE7cj1R91gaqn-TmqjEpJXSnTq-bComCfUTi1BzE6XUgRfJwsrq011Z9k07UkXvnJqKrU5sm3jn7mtQczKeOlFMgzHvZzi_q7DuweSa8sWMPxkdyWjHbVyH_UOYEZCZX0QRoPJ2tYsZsbX6He6iPjYChQpFLtXetugIV0ar2RPfnf9HwrtT8SHEaRwO1CuYxp1_-tUS_akDgdaozvZXDPHyFYZ2FeYXM19LS2-f2FA"/>
+</div>
+</div>
+</div>
+</header>
+<main class="pt-24">
+<!-- Hero Section -->
+<section class="relative px-margin-mobile md:px-margin-desktop py-20 overflow-hidden">
+<div class="max-w-container-max mx-auto text-center flex flex-col items-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-label-md text-label-md mb-stack-md animate-pulse">
+<span class="material-symbols-outlined text-[14px]">bolt</span>
+                    New: YouTube Sentiment Analysis V2
+                </div>
+<h1 class="font-headline-xl text-headline-xl-mobile md:text-headline-xl mb-stack-md text-glow max-w-3xl leading-tight">
+                    Buy Smarter. <span class="text-primary">Not Louder.</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-12">
+                    AI-powered product research across Amazon, Flipkart, YouTube, and Reddit. We cut through the noise so you can make decisions with precision.
+                </p>
+<!-- Command Bar -->
+<div class="w-full max-w-3xl glass-card rounded-full p-2 flex items-center shadow-lg group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+<div class="pl-4 pr-3 flex items-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[28px]">search</span>
+</div>
+<input class="bg-transparent border-none focus:ring-0 w-full font-headline-sm text-headline-sm placeholder:text-outline-variant py-3" placeholder="What product are you looking for?" type="text"/>
+<div class="hidden md:flex items-center pr-4 gap-2">
+<kbd class="px-2 py-1 bg-surface-container rounded font-label-md text-label-md text-on-surface-variant border border-outline-variant/30">Cmd</kbd>
+<kbd class="px-2 py-1 bg-surface-container rounded font-label-md text-label-md text-on-surface-variant border border-outline-variant/30">K</kbd>
+</div>
+<button class="ml-2 px-8 py-3 bg-primary text-on-primary rounded-full font-label-md font-bold hover:opacity-90 transition-opacity">
+                        Analyze
+                    </button>
+</div>
+<!-- Prompt Chips -->
+<div class="mt-stack-lg flex flex-wrap justify-center gap-stack-sm max-w-3xl">
+<button class="px-4 py-2 bg-surface-container-low border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-all">
+                        Best gaming laptop under ₹80,000
+                    </button>
+<button class="px-4 py-2 bg-surface-container-low border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-all">
+                        Compare iPhone vs Samsung
+                    </button>
+<button class="px-4 py-2 bg-surface-container-low border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-high transition-all">
+                        Best wireless earbuds under ₹5000
+                    </button>
+</div>
+</div>
+<!-- Background Decorative Elements -->
+<div class="absolute -z-10 top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
+<div class="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute bottom-10 right-10 w-96 h-96 bg-secondary/5 rounded-full blur-3xl"></div>
+</div>
+</section>
+<!-- Metrics/Trust Strip -->
+<section class="border-y border-outline-variant/20 bg-surface-bright py-stack-md">
+<div class="max-w-container-max mx-auto px-margin-desktop flex flex-wrap justify-around gap-stack-lg">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md text-primary">4.2M</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Reviews Verified</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md text-primary">850k</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Reddit Insights</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md text-primary">12k+</span>
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Brands Tracked</span>
+</div>
+</div>
+</section>
+<!-- Feature Grid (Bento Style) -->
+<section class="px-margin-mobile md:px-margin-desktop py-stack-lg max-w-container-max mx-auto">
+<div class="mb-stack-lg">
+<h2 class="font-headline-lg text-headline-lg mb-stack-xs">Decision Intelligence Engine</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">The tools we use to dismantle marketing hype and find the truth.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-6 gap-gutter">
+<!-- Large Feature -->
+<div class="md:col-span-4 glass-card rounded-xl p-stack-lg hover:shadow-md transition-all group overflow-hidden relative">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="material-symbols-outlined text-primary text-[32px] mb-4">analytics</span>
+<h3 class="font-headline-md text-headline-md">Marketplace Analysis</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm">Aggregated price tracking and historical data across every major Indian retailer.</p>
+</div>
+<div class="hidden sm:block">
+<div class="w-48 h-24 bg-surface-container rounded-lg border border-outline-variant/20 p-2 relative">
+<div class="absolute bottom-2 left-2 right-2 h-1 bg-outline-variant/30 rounded"></div>
+<div class="absolute bottom-2 left-2 w-2/3 h-1 bg-primary rounded"></div>
+<div class="flex justify-between text-[10px] text-primary font-bold">
+<span>Price Drop</span>
+<span>-14%</span>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<img class="w-full h-48 object-cover rounded-lg" data-alt="A clean, professional data visualization dashboard showcasing complex marketplace trends. The interface uses a light-mode palette of whites and soft grays, with deep indigo data lines and emerald accents for positive growth. The composition is structured and minimalist, emphasizing the 'precision' and 'clarity' brand anchors of TrustCart." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaBtJCjS5jGU13zzO2Ok4B1plnRGbkj3oFVVmdfg2nOdHLrdPr6fqujjuT_uT7pVaO93TRuIujwUSxFq0gGEoLZDXVN-Y4QpKhfYGf5P4f_Ieii33NP2ywjt5v-X71V59xqsoizf3baNQzMKC3oJTBpX2N7ykS8aHKCT3YexK4UxI3Nfcy8tGyViUY48NrAP5daKb5dCSm8bcg-BGA9J90EsJObbMpGeMDQmnlT99_NIT-ZOPMQcs8AJWrZxZpLaXB95dBZjS1i2c"/>
+</div>
+</div>
+<!-- Secondary Feature -->
+<div class="md:col-span-2 glass-card rounded-xl p-stack-lg hover:shadow-md transition-all flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-primary text-[32px] mb-4">forum</span>
+<h3 class="font-headline-sm text-headline-sm">Reddit Insights</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Real human opinions scraped from thousands of niche community threads.</p>
+</div>
+<div class="mt-6 flex flex-col gap-2">
+<div class="p-2 bg-surface-container-low rounded border border-outline-variant/10 text-[12px]">"Battery life is stellar but the screen..."</div>
+<div class="p-2 bg-surface-container-low rounded border border-outline-variant/10 text-[12px]">"Best value for money in 2024 hands down."</div>
+</div>
+</div>
+<!-- Small Feature -->
+<div class="md:col-span-2 glass-card rounded-xl p-stack-lg hover:shadow-md transition-all">
+<span class="material-symbols-outlined text-primary text-[32px] mb-4">smart_display</span>
+<h3 class="font-headline-sm text-headline-sm">YouTube Intelligence</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">We watch the reviews so you don't have to. Transcribed, analyzed, summarized.</p>
+<div class="mt-4 flex items-center gap-2">
+<div class="h-2 flex-grow bg-surface-container rounded overflow-hidden">
+<div class="h-full w-4/5 sentiment-gradient"></div>
+</div>
+<span class="text-[10px] font-bold">Positive</span>
+</div>
+</div>
+<!-- Small Feature -->
+<div class="md:col-span-2 glass-card rounded-xl p-stack-lg hover:shadow-md transition-all">
+<span class="material-symbols-outlined text-primary text-[32px] mb-4">verified_user</span>
+<h3 class="font-headline-sm text-headline-sm">Fake Review Detection</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Our neural networks identify non-organic patterns and industrial click-farms.</p>
+<div class="mt-4 px-3 py-1 bg-error-container text-on-error-container rounded-full inline-block text-[11px] font-bold">
+                        Filtered 1.2M Bot Reviews
+                    </div>
+</div>
+<!-- Small Feature -->
+<div class="md:col-span-2 glass-card rounded-xl p-stack-lg hover:shadow-md transition-all bg-primary-container text-on-primary">
+<span class="material-symbols-outlined text-on-primary text-[32px] mb-4">psychology</span>
+<h3 class="font-headline-sm text-headline-sm">AI Recommendations</h3>
+<p class="font-body-sm text-body-sm opacity-80 mt-2">Personalized product discovery based on your actual needs, not affiliate payouts.</p>
+<button class="mt-4 flex items-center gap-1 font-label-md text-label-md underline hover:opacity-80 transition-opacity">
+                        View Demo <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Comparison Table Preview -->
+<section class="px-margin-mobile md:px-margin-desktop py-stack-lg max-w-container-max mx-auto">
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-sm overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant/30 bg-surface-bright flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm">Market Benchmarks</h3>
+<span class="font-label-md text-label-md text-on-surface-variant">Top Tier Performance Laptops</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 font-label-xs text-label-xs text-on-surface-variant uppercase">Product</th>
+<th class="px-6 py-4 font-label-xs text-label-xs text-on-surface-variant uppercase">Trust Score</th>
+<th class="px-6 py-4 font-label-xs text-label-xs text-on-surface-variant uppercase">Sentiment</th>
+<th class="px-6 py-4 font-label-xs text-label-xs text-on-surface-variant uppercase">Market Price</th>
+<th class="px-6 py-4 font-label-xs text-label-xs text-on-surface-variant uppercase">Verdict</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-body-md font-bold">ASUS ROG Zephyrus G14</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-12 h-1 bg-outline-variant/20 rounded">
+<div class="w-11/12 h-full bg-secondary rounded"></div>
+</div>
+<span class="text-secondary font-bold text-[12px]">9.2</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-24 h-1.5 sentiment-gradient rounded-full relative">
+<div class="absolute top-1/2 left-[85%] -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-4 font-label-md">₹1,42,000</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded font-label-xs text-label-xs">Highly Recommended</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-body-md font-bold">MacBook Pro M3 Max</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-12 h-1 bg-outline-variant/20 rounded">
+<div class="w-full h-full bg-secondary rounded"></div>
+</div>
+<span class="text-secondary font-bold text-[12px]">9.8</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-24 h-1.5 sentiment-gradient rounded-full relative">
+<div class="absolute top-1/2 left-[95%] -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-4 font-label-md">₹3,49,900</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant rounded font-label-xs text-label-xs">Premium Choice</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-body-md font-bold">Razer Blade 14</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-12 h-1 bg-outline-variant/20 rounded">
+<div class="w-8/12 h-full bg-tertiary rounded"></div>
+</div>
+<span class="text-tertiary font-bold text-[12px]">7.1</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-24 h-1.5 sentiment-gradient rounded-full relative">
+<div class="absolute top-1/2 left-[60%] -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow-sm"></div>
+</div>
+</td>
+<td class="px-6 py-4 font-label-md">₹2,10,000</td>
+<td class="px-6 py-4">
+<span class="px-2 py-0.5 bg-tertiary-container text-on-tertiary-container rounded font-label-xs text-label-xs">Overpriced</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer Component -->
+<footer class="w-full py-stack-lg mt-auto bg-surface-bright border-t border-outline-variant/30">
+<div class="max-w-container-max mx-auto px-margin-desktop flex flex-col md:flex-row justify-between items-center">
+<div class="flex flex-col items-center md:items-start mb-stack-md md:mb-0">
+<span class="font-headline-sm text-headline-sm font-black text-primary mb-2">TrustCart</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant text-center md:text-left">© 2024 TrustCart AI. Precision Decision Intelligence.</p>
+</div>
+<div class="flex flex-wrap justify-center gap-stack-md">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity duration-200 underline decoration-primary/30" href="#">Marketplace Analysis</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity duration-200 underline decoration-primary/30" href="#">YouTube Intelligence</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity duration-200 underline decoration-primary/30" href="#">Reddit Community Insights</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity duration-200 underline decoration-primary/30" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-opacity duration-200 underline decoration-primary/30" href="#">Terms of Service</a>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interactions for command bar
+        const searchInput = document.querySelector('input[type="text"]');
+        const commandBar = searchInput.parentElement;
+
+        searchInput.addEventListener('focus', () => {
+            commandBar.classList.add('ring-2', 'ring-primary/20', 'scale-[1.01]');
+        });
+
+        searchInput.addEventListener('blur', () => {
+            commandBar.classList.remove('ring-2', 'ring-primary/20', 'scale-[1.01]');
+        });
+
+        // Hover effects for feature cards
+        const cards = document.querySelectorAll('.glass-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body></html>

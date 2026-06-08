@@ -1,4 +1,6 @@
-"""VeriBuy FastAPI Backend — Main Application Entry Point."""
+"""
+VeriBuy FastAPI Backend — Main Application Entry Point.
+"""
 
 import json
 import uuid
@@ -28,7 +30,9 @@ research_results: dict[str, dict] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifecycle events."""
+    """
+    Application lifecycle events.
+    """
     logger.info("🚀 VeriBuy Backend starting...")
 
     hf_ok = await check_huggingface_health()
@@ -82,7 +86,9 @@ async def root():
 
 @app.post("/api/v1/chat")
 async def chat(request: ChatRequest):
-    """Main chat endpoint. Returns SSE stream of agent events."""
+    """
+    Main chat endpoint. Returns SSE stream of agent events.
+    """
     logger.info(f"User queried: {request.message}")
 
     conv_id = request.conversation_id or str(uuid.uuid4())

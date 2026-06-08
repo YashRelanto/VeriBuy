@@ -1,4 +1,6 @@
-"""Pydantic models for all agent I/O and API contracts."""
+"""
+Pydantic models for all agent I/O and API contracts.
+"""
 
 from __future__ import annotations
 from pydantic import BaseModel, Field
@@ -27,6 +29,13 @@ class MissingField(BaseModel):
     question: str
 
 
+class DynamicField(BaseModel):
+    """A dynamically generated field for ambiguity resolution."""
+    name: str = Field(..., description="Field identifier")
+    question: str = Field(..., description="Question to ask the user")
+    type: str = Field("text", description="Field type: text, number, price, yes_no")
+
+
 class IntentOutput(BaseModel):
     """Output from Agent 1 — Intent & Context Understanding."""
     product_category: str = Field(..., description="e.g., earphone, phone, laptop")
@@ -37,8 +46,11 @@ class IntentOutput(BaseModel):
     brand_preferences: list[str] = Field(default_factory=list)
     urgency: Urgency = Field(Urgency.FLEXIBLE)
     is_specific_product: bool = Field(False, description="True if asking about ONE specific product")
+    is_greeting: bool = Field(False, description="True if the user is just saying hello or being conversational")
     is_complete: bool = Field(False, description="True if enough info to search")
     missing_fields: list[MissingField] = Field(default_factory=list)
+    required_fields: list[DynamicField] = Field(default_factory=list, description="Dynamically generated required fields for ambiguity resolution")
+    optional_fields: list[DynamicField] = Field(default_factory=list, description="Dynamically generated optional fields for better search")
     confidence_score: float = Field(0.0, ge=0.0, le=1.0)
 
 
@@ -56,6 +68,7 @@ class ProductResult(BaseModel):
     rating: Optional[float] = None
     review_count: Optional[int] = None
     url: str = ""
+    direct_url: str = Field("", description="Direct marketplace URL (not Google redirect)")
     image_url: Optional[str] = None
     availability: str = "in_stock"
     pros: list[str] = Field(default_factory=list)
@@ -65,6 +78,12 @@ class ProductResult(BaseModel):
     source_types: list[str] = Field(default_factory=list)
     source_diversity_score: float = Field(0.0, ge=0.0, le=1.0)
     risk_flags: list[str] = Field(default_factory=list)
+    is_trusted: bool = True
+    disclaimer: Optional[str] = None
+    relevance_score: float = Field(1.0, ge=0.0, le=1.0)
+    relevance_reason: Optional[str] = None
+    is_exact_match: bool = True
+
 
 
 class MarketOutput(BaseModel):

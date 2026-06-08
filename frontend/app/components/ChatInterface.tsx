@@ -11,7 +11,7 @@ interface AgentStatus {
   message?: string;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
@@ -21,6 +21,8 @@ interface ChatMessage {
 const AGENT_LIST: AgentStatus[] = [
   { name: "intent", label: "Understanding Request", status: "idle" },
   { name: "market", label: "Searching Market", status: "idle" },
+  { name: "reddit", label: "Scanning Reddit", status: "idle" },
+  { name: "youtube", label: "Analyzing YouTube", status: "idle" },
 ];
 
 const SUGGESTIONS = [
@@ -30,16 +32,86 @@ const SUGGESTIONS = [
   { text: "Espresso machine for beginners under ₹20,000", icon: Coffee, desc: "Kitchen" },
 ];
 
+const renderMarkdown = (content: string) => {
+  if (!content) return null;
+  const lines = content.split("\n");
+  
+  const parseInline = (text: string) => {
+    const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      
+      const token = match[0];
+      if (token.startsWith("**") && token.endsWith("**")) {
+        parts.push(<strong key={match.index} className="font-extrabold text-white">{token.slice(2, -2)}</strong>);
+      } else if (token.startsWith("*") && token.endsWith("*")) {
+        parts.push(<em key={match.index} className="italic text-gray-200">{token.slice(1, -1)}</em>);
+      }
+      
+      lastIndex = regex.lastIndex;
+    }
+    
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : text;
+  };
+
+  return lines.map((line, idx) => {
+    if (line.startsWith("## ")) {
+      return (
+        <h3 key={idx} className="text-base font-bold my-2 text-white border-b border-gray-800 pb-1">
+          {parseInline(line.slice(3))}
+        </h3>
+      );
+    }
+    if (line.startsWith("# ")) {
+      return (
+        <h2 key={idx} className="text-lg font-bold my-2 text-white border-b border-gray-800 pb-1">
+          {parseInline(line.slice(2))}
+        </h2>
+      );
+    }
+    if (line.startsWith("- ") || line.startsWith("• ")) {
+      return (
+        <li key={idx} className="ml-4 list-disc text-gray-300 my-1">
+          {parseInline(line.slice(2))}
+        </li>
+      );
+    }
+    return (
+      <p key={idx} className="my-1.5 min-h-[1.2em]">
+        {parseInline(line)}
+      </p>
+    );
+  });
+};
+
 export default function ChatInterface({
   onResearchComplete,
+  initialQuery,
+  messages,
+  setMessages,
+  conversationId,
+  setConversationId,
 }: {
   onResearchComplete: (data: any) => void;
+  initialQuery?: string;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  conversationId: string | null;
+  setConversationId: (id: string | null) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [agents, setAgents] = useState<AgentStatus[]>([...AGENT_LIST]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [interimText, setInterimText] = useState("");
@@ -48,6 +120,14 @@ export default function ChatInterface({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const submittedQueryRef = useRef<string>("");
+
+  useEffect(() => {
+    if (initialQuery && messages.length === 0 && submittedQueryRef.current !== initialQuery) {
+      submittedQueryRef.current = initialQuery;
+      handleSubmit(initialQuery);
+    }
+  }, [initialQuery]);
 
   // Init Web Speech API
   useEffect(() => {
@@ -197,6 +277,32 @@ export default function ChatInterface({
     }
   };
 
+  const buildFollowupMessage = (evData: any, message: string) => {
+    const requiredFields = evData?.required_fields || [];
+    const optionalFields = evData?.optional_fields || [];
+    
+    if (requiredFields.length === 0 && optionalFields.length === 0) {
+      return message || "Could you tell me a bit more?";
+    }
+    
+    let conversationalMsg = "To help you find the best options, could you let me know:\n\n";
+    
+    if (requiredFields.length > 0) {
+      requiredFields.forEach((field: any) => {
+        conversationalMsg += `- ${field.question}\n`;
+      });
+    }
+    
+    if (optionalFields.length > 0) {
+      conversationalMsg += "\nAlso, if you have preferences for these, feel free to share:\n";
+      optionalFields.forEach((field: any) => {
+        conversationalMsg += `- ${field.question}\n`;
+      });
+    }
+    
+    return conversationalMsg;
+  };
+
   const handleSSEEvent = (data: any, onToken: (text: string) => void) => {
     const { event_type, agent, message, data: evData } = data;
     switch (event_type) {
@@ -216,9 +322,10 @@ export default function ChatInterface({
         if (evData) onResearchComplete(evData);
         break;
       case "followup_needed":
+        const followupContent = buildFollowupMessage(evData, message);
         setMessages((p) => [
           ...p,
-          { id: crypto.randomUUID(), role: "assistant", content: message || "Could you tell me a bit more?", timestamp: new Date() },
+          { id: crypto.randomUUID(), role: "assistant", content: followupContent, timestamp: new Date() },
         ]);
         break;
       case "error":
@@ -350,7 +457,7 @@ export default function ChatInterface({
                         }
                   }
                 >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
                   <div
                     className="text-[10px] mt-1.5"
                     style={{ color: msg.role === "user" ? "rgba(255,255,255,0.6)" : "var(--text-tertiary)", textAlign: msg.role === "user" ? "right" : "left" }}
@@ -383,7 +490,7 @@ export default function ChatInterface({
                   className="msg-bubble px-4 py-3 text-[13.5px] leading-relaxed"
                   style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", color: "var(--text-secondary)", borderRadius: "4px 18px 18px 18px", boxShadow: "var(--card-shadow)" }}
                 >
-                  <span className="whitespace-pre-wrap">{streamingText}</span>
+                  <span className="whitespace-pre-wrap">{renderMarkdown(streamingText)}</span>
                   <span
                     className="inline-block w-[3px] h-4 ml-0.5 animate-pulse align-middle"
                     style={{ background: "var(--primary)", borderRadius: "2px" }}

@@ -44,8 +44,11 @@ class BotDetector:
             if re.search(pattern, text):
                 score += 1.5
                 
-        # Length penalty for extremely short or extremely long generic comments
-        if len(text) < 20:
-            score -= 0.5
+        # Length penalty for extremely long generic comments without genuine signals
+        if len(text) > 400:
+            # Check if it has any genuine signals, if not, penalize heavily
+            has_genuine = any(re.search(pattern, text) for pattern in self.genuine_patterns)
+            if not has_genuine:
+                score -= 2.0
             
         return score

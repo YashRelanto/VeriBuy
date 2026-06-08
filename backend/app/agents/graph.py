@@ -22,6 +22,9 @@ class ResearchState(TypedDict):
     # Flow control
     missing_fields: list[dict] | None
     errors: Annotated[list[str], operator.add]
+    
+    # Rejection tracking across agents
+    rejection_reasons: dict[str, list[str]] | None
 
 # 2. Node Functions
 async def intent_node(state: ResearchState):
@@ -30,9 +33,15 @@ async def intent_node(state: ResearchState):
         intent = await run_intent_agent(state["query"], state["conversation_history"])
         intent_dict = intent.model_dump()
         
+        # Use new dynamic fields system (required_fields/optional_fields)
+        # Fall back to missing_fields only if required_fields is empty
         missing = None
-        if not intent.is_complete and intent.missing_fields:
-            missing = [mf.model_dump() for mf in intent.missing_fields]
+        if not intent.is_complete:
+            if intent.required_fields:
+                logger.info(f"Using LLM-generated required fields: {[f.name for f in intent.required_fields]}")
+                missing = [f.model_dump() for f in intent.required_fields]
+            elif intent.missing_fields:
+                missing = [mf.model_dump() for mf in intent.missing_fields]
             
         return {"intent": intent_dict, "missing_fields": missing}
     except Exception as e:
@@ -58,8 +67,10 @@ async def reddit_node(state: ResearchState):
     if not state.get("intent"):
         return {}
     try:
-        # Pass the original user query so reddit searches for the right thing
-        reddit = await run_reddit_agent(state["intent"], state["query"])
+        market_data = state.get("market") or {}
+        products = market_data.get("products") or []
+        # Pass the original user query and the discovered products
+        reddit = await run_reddit_agent(state["intent"], state["query"], products)
         return {"reddit": reddit}
     except Exception as e:
         logger.error(f"Reddit node failed: {e}")
@@ -70,8 +81,10 @@ async def youtube_node(state: ResearchState):
     if not state.get("intent"):
         return {}
     try:
-        # Pass the original user query so youtube searches for the right thing
-        youtube = await run_youtube_agent(state["intent"], state["query"])
+        market_data = state.get("market") or {}
+        products = market_data.get("products") or []
+        # Pass the original user query and the discovered products
+        youtube = await run_youtube_agent(state["intent"], state["query"], products)
         return {"youtube": youtube}
     except Exception as e:
         logger.error(f"YouTube node failed: {e}")
@@ -81,12 +94,26 @@ async def youtube_node(state: ResearchState):
 def route_after_intent(state: ResearchState) -> Sequence[str]:
     if state.get("errors"):
         return ["__end__"]
+        
+    intent = state.get("intent") or {}
+    if intent.get("is_greeting"):
+        return ["__end__"]
+        
     if state.get("missing_fields"):
         # Needs follow up, skip research
         return ["__end__"]
     
-    # Run all three in parallel
-    return ["market", "reddit", "youtube"]
+    # Run market analysis first
+    return ["market"]
+
+def route_after_market(state: ResearchState) -> Sequence[str]:
+    if state.get("errors"):
+        return ["__end__"]
+    market = state.get("market") or {}
+    if not market.get("products"):
+        return ["__end__"]
+    # Run both review agents in parallel
+    return ["reddit", "youtube"]
 
 # 4. Build Graph
 workflow = StateGraph(ResearchState)
@@ -103,13 +130,20 @@ workflow.add_conditional_edges(
     route_after_intent,
     {
         "__end__": END,
-        "market": "market",
+        "market": "market"
+    }
+)
+
+workflow.add_conditional_edges(
+    "market",
+    route_after_market,
+    {
+        "__end__": END,
         "reddit": "reddit",
         "youtube": "youtube"
     }
 )
 
-workflow.add_edge("market", END)
 workflow.add_edge("reddit", END)
 workflow.add_edge("youtube", END)
 

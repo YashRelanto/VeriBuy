@@ -3,3 +3,5 @@ backend/.env
 ./venv
  docker-compose.yml
 setup_ollama_models.ps1
+venv
+__pycache__

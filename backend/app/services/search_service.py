@@ -38,6 +38,16 @@ def _extract_platform(url: str) -> str:
         return "Amazon"
     if "flipkart." in lower_url:
         return "Flipkart"
+    if "zepto." in lower_url:
+        return "Zepto"
+    if "bigbasket." in lower_url:
+        return "BigBasket"
+    if "swiggy." in lower_url or "instamart" in lower_url:
+        return "Instamart"
+    if "blinkit." in lower_url:
+        return "Blinkit"
+    if "olx." in lower_url:
+        return "OLX"
     if "croma." in lower_url:
         return "Croma"
     if "reliancedigital." in lower_url:
@@ -66,6 +76,41 @@ def _scrape_page_text(url: str, max_chars: int = 5000) -> str:
     except Exception as e:
         logger.warning(f"Scrape failed for {url}: {e}")
         return ""
+
+
+def _parse_view_count(view_str: str) -> int | None:
+    """Parse view count string from Serper API response.
+    
+    Examples: "1.2M", "1200K", "523,456", "523456" -> 1200000, 1200000, 523456, 523456
+    """
+    if not view_str:
+        return None
+    
+    view_str = view_str.strip().upper()
+    
+    # Remove commas
+    view_str = view_str.replace(",", "")
+    
+    # Handle abbreviated formats
+    if "M" in view_str:
+        try:
+            num = float(view_str.replace("M", ""))
+            return int(num * 1_000_000)
+        except ValueError:
+            pass
+    
+    if "K" in view_str:
+        try:
+            num = float(view_str.replace("K", ""))
+            return int(num * 1_000)
+        except ValueError:
+            pass
+    
+    # Try direct number parsing
+    try:
+        return int(float(view_str))
+    except ValueError:
+        return None
 
 
 async def search_products(
@@ -146,6 +191,9 @@ async def search_products(
             if is_suspicious_url(url) or is_suspicious_url(item.get("source", "")):
                 continue
 
+            # Extract direct URL - the "link" field from Serper is typically the direct marketplace URL
+            direct_url = url  # Direct marketplace URL for dashboard links
+
             products.append({
                 "name": title,
                 "brand": "",
@@ -157,6 +205,7 @@ async def search_products(
                 "rating": item.get("rating"),
                 "review_count": item.get("ratingCount"),
                 "url": url,
+                "direct_url": direct_url,  # Direct marketplace URL for dashboard links
                 "availability": "in_stock",
                 "image_url": item.get("imageUrl", None),
                 "description": sanitize_untrusted_text(item.get("delivery", ""), max_chars=800),
@@ -181,6 +230,9 @@ async def search_products(
             if is_suspicious_url(url):
                 continue
 
+            # Extract direct URL from organic results
+            direct_url = url  # Direct URL for organic search results
+
             products.append({
                 "name": title,
                 "brand": "",
@@ -192,6 +244,7 @@ async def search_products(
                 "rating": None,
                 "review_count": None,
                 "url": url,
+                "direct_url": direct_url,  # Direct URL for dashboard links
                 "availability": "in_stock",
                 "image_url": item.get("imageUrl", None),
                 "description": sanitize_untrusted_text(snippet, max_chars=800),
@@ -262,8 +315,17 @@ async def search_deals_for_product(product_name: str, num_results: int = 8) -> l
         return []
 
 
-async def search_reddit_threads(query: str, subreddits: list[str], num_results: int = 5) -> list[dict]:
-    """Search for relevant Reddit threads using Serper API."""
+async def search_reddit_threads(query: str, num_results: int = 5, subreddits: list[str] = None) -> list[dict]:
+    """Search for relevant Reddit threads using Serper API with site:reddit.com filter.
+    
+    Args:
+        query: The search query for products/discussions
+        num_results: Number of threads to retrieve (default 5)
+        subreddits: DEPRECATED - now uses site:reddit.com filter for all subreddits
+    
+    Returns:
+        List of Reddit thread dictionaries with title, url, and snippet
+    """
     settings = get_settings()
     if not settings.serper_api_key:
         return []
@@ -271,9 +333,9 @@ async def search_reddit_threads(query: str, subreddits: list[str], num_results: 
     try:
         def fetch_serper():
             url = "https://google.serper.dev/search"
-            site_query = " OR ".join([f"site:reddit.com/r/{sub}" for sub in subreddits])
+            # Use site:reddit.com to search all of Reddit instead of specific subreddits
             payload = {
-                "q": f"{query} ({site_query})",
+                "q": f"{query} site:reddit.com/r/",
                 "gl": "in",
                 "num": num_results
             }
@@ -395,8 +457,12 @@ async def search_youtube_videos(query: str, channels: list[str], num_results: in
 
             title = item.get("title", "")
             snippet = sanitize_untrusted_text(item.get("snippet") or item.get("description", ""), max_chars=1000)
-            channel = item.get("channel") or item.get("source") or ""
+            channel = item.get("channel") or item.get("channelTitle") or item.get("source") or ""
             score, reasons = score_video(title, snippet, channel)
+            
+            # Extract view count from Serper response
+            view_count_str = item.get("viewCount") or item.get("views") or ""
+            view_count = _parse_view_count(view_count_str)
 
             videos.append({
                 "title": title,
@@ -405,6 +471,7 @@ async def search_youtube_videos(query: str, channels: list[str], num_results: in
                 "snippet": snippet,
                 "channel": channel,
                 "duration": item.get("duration", ""),
+                "view_count": view_count,
                 "rank_score": score,
                 "rank_reasons": reasons
             })

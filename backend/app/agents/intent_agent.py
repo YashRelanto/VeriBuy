@@ -13,32 +13,53 @@ INTENT_SYSTEM_PROMPT = """You are an expert product research assistant. Extract 
 
 You MUST respond with ONLY valid JSON matching this schema:
 {{
-    "product_category": "string (e.g., earphone, phone, laptop, camera)",
-    "product_name": "string or null (specific product name if mentioned, e.g. 'Sony WH-1000XM5')",
-    "specifications": ["list of desired specs the user mentioned"],
+    "product_category": "string (e.g., earphone, phone, laptop, camera, TV)",
+    "product_name": "string or null (specific product name if mentioned)",
+    "specifications": ["list of desired specs"],
     "budget_range": {{"min_price": 0, "max_price": 999999, "currency": "INR"}},
-    "usage_context": "string (e.g., gaming, music, office, travel)",
+    "usage_context": "string (e.g., gaming, music, office, travel) or general",
     "brand_preferences": ["brands the user prefers"],
-    "urgency": "immediate | can_wait | flexible",
+    "urgency": "immediate or can_wait or flexible",
     "is_specific_product": false,
+    "is_greeting": false,
     "is_complete": true,
-    "missing_fields": [{{"field_name": "budget", "question": "What is your budget for the earphone?"}}],
+    "missing_fields": [],
+    "required_fields": [{{"name": "budget", "question": "What is your budget in INR?", "type": "price"}}],
+    "optional_fields": [{{"name": "screen_size", "question": "Preferred screen size?", "type": "text"}}, {{"name": "panel_type", "question": "Display type preference?", "type": "text"}}],
     "confidence_score": 0.8
 }}
 
-RULES:
-1. Extract ALL information the user has ALREADY provided.
-2. "product_category" is REQUIRED — always extract or infer it.
-3. "budget_range" is important — if not mentioned, set is_complete=false and add to missing_fields.
-4. "usage_context" — if not mentioned, set to "general" (do NOT ask about it).
-5. Set "is_specific_product" to true ONLY if user asks about ONE specific product by name.
-6. Set "is_complete" to true if product_category AND budget_range are available.
-7. Only add to "missing_fields" if absolutely essential info is missing (only budget if not given).
-8. "specifications", "brand_preferences", "urgency" are OPTIONAL — never ask for them.
+CRITICAL REQUIREMENT: ALWAYS include both required_fields and optional_fields arrays. They must NEVER be empty if product_category is known.
 
-9. If the user gives one budget number, like "4000 INR" or "under 4000", treat it as max_price and set min_price to 0.
+RULES FOR FIELD GENERATION:
 
-Respond with ONLY the JSON object, no other text."""
+**REQUIRED FIELDS** (absolute must-haves):
+- For ALL products: budget is ALWAYS required (price type) with question "What is your budget in INR?"
+- If product type is clear (TV, Laptop, etc.), only ask for budget
+
+**OPTIONAL FIELDS** (enhance search, ALWAYS include these):
+- For TV: screen_size (32 inch, 43 inch, 55 inch, 65 inch), panel_type (LED, QLED, OLED), refresh_rate, smart_tv_needed, hdr_support
+- For Laptop: processor_brand, ram_size, storage_type, gpu, display_refresh, screen_size
+- For Headphones: connection_type, noise_cancellation, water_resistance, battery_life
+- For Phone: processor_brand, storage_size, camera_quality, battery_capacity, display_type
+- For Earbuds: noise_cancellation, water_resistance, battery_life, charging_case
+
+WHEN TO POPULATE:
+- If product_category is NOT unknown, ALWAYS generate 3-5 optional_fields for that category
+- Never duplicate between required_fields and optional_fields
+- Skip optional fields the user already mentioned
+
+GENERAL RULES:
+1. Extract ALL information the user already provided.
+2. Never return null for usage_context - use general if not mentioned.
+3. Never return 0 for max_price - use 999999 if no budget specified.
+4. If user says hello/greeting: is_greeting=true, product_category=unknown, put greeting question in required_fields.
+5. Set is_complete=true ONLY if: (a) product_category known, (b) budget_range has specific limits, (c) all required fields filled.
+6. Use types: text, number, price, yes_no, multiselect.
+7. If user says budget like 50000 INR, treat as max_price (min=0).
+8. is_specific_product=true ONLY if exact product name AND model number mentioned.
+
+Respond with ONLY the JSON object, no text before or after."""
 
 
 def _normalize_budget(result: IntentOutput) -> IntentOutput:
@@ -75,25 +96,77 @@ async def run_intent_agent(user_message: str, conversation_history: list[dict] =
         result = parse_and_validate(raw_response, IntentOutput)
         result = _normalize_budget(result)
 
+        # If LLM marked as incomplete and generated required_fields, use those
+        if not result.is_complete:
+            if result.required_fields:
+                logger.info(f"Using LLM-generated required fields: {[f.name for f in result.required_fields]}")
+            else:
+                # Fallback: if no fields generated but incomplete, enforce basic budget check
+                cat = (result.product_category or "").lower()
+                if not result.is_greeting and result.product_category != "unknown":
+                    is_budget_provided = result.budget_range and (result.budget_range.max_price < 999999 or result.budget_range.min_price > 0)
+                    if not is_budget_provided:
+                        from app.models.schemas import DynamicField
+                        result.required_fields.append(DynamicField(
+                            name="budget",
+                            question=f"What is your budget or price range for the {result.product_category}?",
+                            type="price"
+                        ))
+        else:
+            # If marked complete, verify budget is truly set
+            if result.budget_range.max_price >= 999999 and result.budget_range.min_price == 0:
+                result.is_complete = False
+                from app.models.schemas import DynamicField
+                result.required_fields.append(DynamicField(
+                    name="budget",
+                    question=f"What is your budget or price range for the {result.product_category}?",
+                    type="price"
+                ))
+
         logger.info(
             f"Intent extracted: category={result.product_category}, "
             f"specific={result.is_specific_product}, complete={result.is_complete}, "
             f"confidence={result.confidence_score}"
         )
+        
+        # Log user query intent details
+        logger.info(f"user_queried=\"{user_message}\"")
+        
+        # Log missing fields
+        missing_field_names = []
+        if not result.is_complete and result.required_fields:
+            missing_field_names = [f.name for f in result.required_fields if f.name]
+        logger.info(f"missing_fields={missing_field_names}")
+        
+        # Log final requirements
+        final_reqs = {
+            "product_category": result.product_category,
+            "budget_range": result.budget_range.model_dump() if result.budget_range else None,
+            "usage_context": result.usage_context,
+            "brand_preferences": result.brand_preferences,
+            "specifications": result.specifications
+        }
+        logger.info(f"final_requirements={final_reqs}")
+        
         return result
 
     except Exception as e:
         logger.error(f"Intent agent error: {e}")
         # Return minimal intent so the pipeline can ask follow-up
+        from app.models.schemas import DynamicField
         return IntentOutput(
             product_category="unknown",
             usage_context=user_message,
             confidence_score=0.1,
             is_complete=False,
-            missing_fields=[
-                MissingField(
-                    field_name="product_category",
-                    question="What type of product are you looking for?"
+            is_greeting=False,
+            required_fields=[
+                DynamicField(
+                    name="product_category",
+                    question="What type of product are you looking for? (e.g., TV, Laptop, Phone, Headphones)",
+                    type="text"
                 )
-            ]
+            ],
+            optional_fields=[],
+            missing_fields=[]  # Deprecated, use required_fields instead
         )

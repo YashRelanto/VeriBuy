@@ -26,17 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        {/* Background effects */}
-        <div className="fixed inset-0 bg-grid pointer-events-none z-0" />
-        <div
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] pointer-events-none z-0"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, rgba(99,102,241,0.08) 0%, transparent 70%)",
-          }}
-        />
         <main className="relative z-10">{children}</main>
       </body>
     </html>

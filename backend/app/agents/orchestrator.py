@@ -24,7 +24,8 @@ async def run_agent_pipeline(
         "reddit": None,
         "youtube": None,
         "missing_fields": None,
-        "errors": []
+        "errors": [],
+        "rejection_reasons": None
     }
 
     # Start Intent
@@ -39,6 +40,7 @@ async def run_agent_pipeline(
     final_market = None
     final_reddit = None
     final_youtube = None
+    all_rejection_reasons = {}
 
     # Stream graph execution — only runs the graph ONCE
     async for step in research_graph.astream(state):
@@ -64,14 +66,26 @@ async def run_agent_pipeline(
             if intent_result.get("missing_fields"):
                 missing = intent_result["missing_fields"]
                 questions = [mf["question"] for mf in missing]
+                
+                # Prepare required and optional fields if available from LLM
+                required_fields = final_intent.get("required_fields", []) if final_intent else []
+                optional_fields = final_intent.get("optional_fields", []) if final_intent else []
+                
+                if final_intent and final_intent.get("is_greeting"):
+                    msg = " ".join(questions)
+                else:
+                    msg = "I need a bit more info: " + " ".join(questions)
+                    
                 yield AgentEvent(
                     event_type="followup_needed",
                     agent="intent",
                     data={
                         "missing_fields": missing,
+                        "required_fields": required_fields,
+                        "optional_fields": optional_fields,
                         "partial_intent": final_intent
                     },
-                    message="I need a bit more info: " + " ".join(questions)
+                    message=msg
                 )
                 yield AgentEvent(event_type="done", data={"status": "awaiting_input"})
                 return
@@ -83,6 +97,8 @@ async def run_agent_pipeline(
 
         elif "market" in step:
             final_market = step["market"].get("market")
+            if final_market and final_market.get("rejection_reasons"):
+                all_rejection_reasons["market"] = final_market.get("rejection_reasons", [])
             yield AgentEvent(
                 event_type="agent_complete",
                 agent="market",
@@ -92,6 +108,8 @@ async def run_agent_pipeline(
             
         elif "reddit" in step:
             final_reddit = step["reddit"].get("reddit")
+            if final_reddit and final_reddit.get("rejection_reasons"):
+                all_rejection_reasons["reddit"] = final_reddit.get("rejection_reasons", [])
             yield AgentEvent(
                 event_type="agent_complete",
                 agent="reddit",
@@ -101,6 +119,8 @@ async def run_agent_pipeline(
             
         elif "youtube" in step:
             final_youtube = step["youtube"].get("youtube")
+            if final_youtube and final_youtube.get("rejection_reasons"):
+                all_rejection_reasons["youtube"] = final_youtube.get("rejection_reasons", [])
             yield AgentEvent(
                 event_type="agent_complete",
                 agent="youtube",
@@ -111,18 +131,11 @@ async def run_agent_pipeline(
     # Use collected results (no second graph invocation!)
     if final_market and not final_market.get("products"):
         no_result_text = "I couldn't find products matching your criteria. Try broadening your search."
-        for i in range(0, len(no_result_text), 3):
-            yield AgentEvent(event_type="token", data={"content": no_result_text[i:i+3]})
         yield AgentEvent(event_type="done", data={"status": "complete"})
         return
         
     # Format summary text for the chat
     summary_text = _format_summary(final_intent, final_market, final_reddit, final_youtube)
-    for i in range(0, len(summary_text), 3):
-        yield AgentEvent(
-            event_type="token",
-            data={"content": summary_text[i:i+3]}
-        )
 
     # Run deal finder for the top pick
     best_deals = []
@@ -144,6 +157,52 @@ async def run_agent_pipeline(
                 message=f"Found {len(best_deals)} cross-platform deals"
             )
 
+    # Log aggregated source findings before final result
+    sources_found = {
+        "DuckDuckGo": final_market and final_market.get("total_found", 0) > 0,
+        "reddit": final_reddit and final_reddit.get("threads_analyzed", 0) > 0,
+        "youtube": final_youtube and final_youtube.get("videos_analyzed", 0) > 0
+    }
+    
+    # Build product-to-sources mapping
+    product_sources_mapping = {}
+    if final_market and final_market.get("products"):
+        for product in final_market.get("products", []):
+            product_name = product.get("name", "Unknown")
+            product_sources_mapping[product_name] = {
+                "reddit_url": None,
+                "youtube_url": None
+            }
+    
+    # Add Reddit links if available
+    if final_reddit and final_reddit.get("top_comments"):
+        for comment in final_reddit.get("top_comments", []):
+            thread_title = comment.get("thread_title", "")
+            thread_url = comment.get("thread_url", "")
+            # Try to match with products - this is a simplified approach
+            for product_name in product_sources_mapping:
+                if product_name.lower() in thread_title.lower():
+                    product_sources_mapping[product_name]["reddit_url"] = thread_url
+                    break
+    
+    # Add YouTube links if available
+    if final_youtube and final_youtube.get("top_videos"):
+        for video in final_youtube.get("top_videos", []):
+            video_title = video.get("title", "")
+            video_url = video.get("url", "")
+            # Try to match with products
+            for product_name in product_sources_mapping:
+                if product_name.lower() in video_title.lower():
+                    product_sources_mapping[product_name]["youtube_url"] = video_url
+                    break
+    
+    logger.info(
+        f"sources_found={{\"DuckDuckGo\": {sources_found['DuckDuckGo']}, "
+        f"\"reddit\": {sources_found['reddit']}, "
+        f"\"youtube\": {sources_found['youtube']}}}"
+    )
+    logger.info(f"product_sources_mapping={product_sources_mapping}")
+
     yield AgentEvent(
         event_type="final_result",
         data={
@@ -152,6 +211,7 @@ async def run_agent_pipeline(
             "reddit": final_reddit,
             "youtube": final_youtube,
             "best_deals": best_deals,
+            "rejection_reasons": all_rejection_reasons if all_rejection_reasons else None,
             "guardrails": _build_guardrail_summary(final_market, final_reddit, final_youtube)
         },
         message="Research complete! See the dashboard for details."
@@ -159,51 +219,6 @@ async def run_agent_pipeline(
     yield AgentEvent(event_type="done", data={"status": "complete"})
 
 
-def _format_summary(intent, market, reddit, youtube) -> str:
-    """Format a chat-friendly summary of results."""
-    lines = []
-    
-    if intent and market and market.get("products"):
-        products = market["products"]
-        lines.append(f"\n\n## Found {market.get('total_found')} options for {intent.get('product_category')}\n\n")
-        for i, p in enumerate(products[:3], 1):
-            price = p.get('price', 0)
-            lines.append(f"**{i}. {p.get('name')}** — ₹{price:,.0f}")
-            if p.get('platform'):
-                lines.append(f" ({p.get('platform')})")
-            lines.append("\n")
-            
-    if reddit and reddit.get("top_comments"):
-        lines.append("\n**Reddit Highlights:**\n")
-        for c in reddit["top_comments"][:2]:
-            lines.append(f"- \"{c['comment'][:150]}...\"\n")
-            
-    if youtube and youtube.get("transcripts"):
-        lines.append("\n**YouTube Insights:**\n")
-        for v in youtube["transcripts"][:2]:
-            lines.append(f"- *{v['title']}*: {v['transcript_snippet'][:100]}...\n")
-
-    if youtube and youtube.get("recommendations"):
-        lines.append("\n**YouTube-backed recommendations:**\n")
-        for product in youtube["recommendations"][:3]:
-            name = product.get("name", "Unknown product")
-            reason = product.get("why_recommended") or product.get("best_for", "")
-            lines.append(f"- **{name}**")
-            if reason:
-                lines.append(f": {reason[:160]}")
-            lines.append("\n")
-
-    buying_advice = (youtube or {}).get("analysis", {}).get("buying_advice", [])
-    if buying_advice:
-        lines.append("\n**Creator buying advice:**\n")
-        for advice in buying_advice[:2]:
-            lines.append(f"- {advice}\n")
-
-    lines.append("\n📊 *Check the dashboard for detailed comparisons.*\n")
-    return "".join(lines)
-
-
-# Guardrail-aware formatter overrides the legacy formatter above.
 def _format_summary(intent, market, reddit, youtube) -> str:
     """Format a chat-friendly summary with confidence, trust, and risk notes."""
     lines = []
@@ -226,6 +241,13 @@ def _format_summary(intent, market, reddit, youtube) -> str:
 
     if reddit and reddit.get("top_comments"):
         lines.append("\n**Reddit Highlights:**\n")
+        if reddit.get("analysis"):
+            analysis = reddit["analysis"]
+            lines.append(f"*{analysis.get('summary', '')}*\n")
+            if analysis.get("pros"):
+                lines.append(f"**Pros**: {', '.join(analysis['pros'][:3])}\n")
+            if analysis.get("cons"):
+                lines.append(f"**Cons**: {', '.join(analysis['cons'][:3])}\n")
         for c in reddit["top_comments"][:2]:
             risk = c.get("risk_flags") or []
             suffix = f" Risk: {', '.join(risk[:1])}." if risk else ""
